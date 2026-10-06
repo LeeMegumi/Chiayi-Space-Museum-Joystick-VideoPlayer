@@ -35,6 +35,12 @@ public class VideoNodeNavigator : MonoBehaviour
     [Tooltip("逐一新增節點，播放時會自動依 Time 由小到大排序，Inspector 順序不影響邏輯。")]
     public List<VideoNode> nodes = new List<VideoNode>();
 
+    [Header("外部影片資料夾")]
+    [Tooltip("勾選後，會優先播放執行檔旁邊資料夾內的影片（檔名排序第一個）；資料夾沒有影片時播放 Video Player 上原本指定的影片。")]
+    public bool useExternalVideoFolder = true;
+    [Tooltip("資料夾名稱。Build 後位於 .exe 旁邊；Editor 中位於專案根目錄（Assets 的上一層）。")]
+    public string externalFolderName = ExternalVideoFolder.DefaultFolderName;
+
     [Header("輸入按鍵")]
     public KeyCode nextKey = KeyCode.RightArrow;
     public KeyCode previousKey = KeyCode.LeftArrow;
@@ -57,6 +63,21 @@ public class VideoNodeNavigator : MonoBehaviour
         videoPlayer = GetComponent<VideoPlayer>();
         videoPlayer.isLooping = true;    // 整支影片持續 Loop
         videoPlayer.playOnAwake = false; // 由本腳本控制播放時機
+
+        if (useExternalVideoFolder)
+        {
+            string path = ExternalVideoFolder.FindVideo(externalFolderName);
+            if (path != null)
+            {
+                videoPlayer.source = VideoSource.Url;
+                videoPlayer.url = path;
+                Debug.Log("[ExternalVideo] 播放外部影片：" + path);
+            }
+            else
+            {
+                Debug.Log("[ExternalVideo] 資料夾內沒有影片，播放內建影片：" + ExternalVideoFolder.GetFolderPath(externalFolderName));
+            }
+        }
     }
 
     void Start()
@@ -121,7 +142,10 @@ public class VideoNodeNavigator : MonoBehaviour
         index = Mathf.Clamp(index, 0, nodes.Count - 1);
         CurrentIndex = index;
 
-        videoPlayer.time = nodes[index].time;   // seek 到節點時間
+        // 外部影片可能比原本短：節點秒數超過影片長度時改跳回開頭，避免 seek 到影片外
+        double t = nodes[index].time;
+        if (videoPlayer.length > 0 && t >= videoPlayer.length) t = 0;
+        videoPlayer.time = t;                   // seek 到節點時間
         if (!videoPlayer.isPlaying)
             videoPlayer.Play();
 
