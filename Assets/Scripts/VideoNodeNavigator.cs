@@ -41,6 +41,10 @@ public class VideoNodeNavigator : MonoBehaviour
     [Tooltip("資料夾名稱。Build 後位於 .exe 旁邊；Editor 中位於專案根目錄（Assets 的上一層）。")]
     public string externalFolderName = ExternalVideoFolder.DefaultFolderName;
 
+    [Header("畫面比例")]
+    [Tooltip("影片比例與輸出畫面（RenderTexture）不同時的處理方式。\nFit Inside = 等比例完整顯示，多出來的地方留黑邊（建議）。\nFit Outside = 等比例填滿，超出的部分裁掉。\nStretch = 拉伸填滿（會變形）。")]
+    public VideoAspectRatio aspectRatio = VideoAspectRatio.FitInside;
+
     [Header("輸入按鍵")]
     public KeyCode nextKey = KeyCode.RightArrow;
     public KeyCode previousKey = KeyCode.LeftArrow;
@@ -60,9 +64,14 @@ public class VideoNodeNavigator : MonoBehaviour
 
     void Awake()
     {
+        Application.runInBackground = true; // 視窗失去焦點時也繼續播放與接收搖桿訊號
         videoPlayer = GetComponent<VideoPlayer>();
         videoPlayer.isLooping = true;    // 整支影片持續 Loop
         videoPlayer.playOnAwake = false; // 由本腳本控制播放時機
+
+        // 影片比例與輸出畫面不同時，等比例縮放置入，其餘留黑邊
+        videoPlayer.aspectRatio = aspectRatio;
+        ClearTargetTexture();
 
         if (useExternalVideoFolder)
         {
@@ -91,6 +100,18 @@ public class VideoNodeNavigator : MonoBehaviour
     {
         if (videoPlayer != null)
             videoPlayer.prepareCompleted -= OnPrepared;
+    }
+
+    // 把輸出用的 RenderTexture 清成黑色，確保影片沒蓋到的區域是黑邊而不是殘留畫面
+    private void ClearTargetTexture()
+    {
+        RenderTexture rt = videoPlayer.targetTexture;
+        if (rt == null) return;
+
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = rt;
+        GL.Clear(true, true, Color.black);
+        RenderTexture.active = previous;
     }
 
     private void OnPrepared(VideoPlayer vp)
